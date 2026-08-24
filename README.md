@@ -22,8 +22,10 @@ The AI Workplace Assistant works offline with the built-in workplace knowledge b
 ```env
 AI_API_KEY=your_provider_key
 AI_MODEL=gpt-4o-mini
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/?retryWrites=true&w=majority
+MONGODB_DATABASE=corpsim
 ```
 
-Start it with `npm run server`, then set `VITE_AI_API_URL=http://localhost:3001/api/chat` in the frontend environment and restart Vite. The backend uses the OpenAI-compatible Chat Completions API by default; set `AI_API_URL` for another compatible provider. Keep provider API keys on the server and never put them in Vite client environment variables.
+Start it with `npm run server`, then set `VITE_AI_API_URL=http://localhost:3001/api/chat` in the frontend environment and restart Vite. The backend uses the OpenAI-compatible Chat Completions API by default; set `AI_API_URL` for another compatible provider. When `MONGODB_URI` is set, chat exchanges are saved in the `chat_messages` collection. Keep provider API keys and MongoDB credentials on the server and never put them in Vite client environment variables.
 
 The backend exposes `GET /health` and `POST /api/chat`. The chat endpoint receives `{ messages, context }` and returns `{ message }`.

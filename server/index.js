@@ -1,9 +1,42 @@
 import http from 'node:http';
+import { MongoClient } from 'mongodb';
 
 const port = Number(process.env.PORT || 3001);
 const providerUrl = process.env.AI_API_URL || 'https://api.openai.com/v1/chat/completions';
 const apiKey = process.env.AI_API_KEY;
 const model = process.env.AI_MODEL || 'gpt-4o-mini';
+const mongoUri = process.env.MONGODB_URI;
+const mongoDatabase = process.env.MONGODB_DATABASE || 'corpsim';
+let chatCollectionPromise;
+
+function getChatCollection() {
+  if (!mongoUri) return null;
+  if (!chatCollectionPromise) {
+    chatCollectionPromise = (async () => {
+      const client = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 3000 });
+      await client.connect();
+      return client.db(mongoDatabase).collection('chat_messages');
+    })();
+  }
+  return chatCollectionPromise;
+}
+
+async function saveConversation(requestBody, assistantMessage) {
+  const collection = getChatCollection();
+  if (!collection) return;
+
+  try {
+    await (await collection).insertOne({
+      messages: requestBody.messages,
+      assistantMessage,
+      context: requestBody.context || {},
+      createdAt: new Date()
+    });
+  } catch (error) {
+    console.error('MongoDB persistence failed:', error.message);
+    chatCollectionPromise = null;
+  }
+}
 
 function sendJson(response, status, body) {
   response.writeHead(status, {
@@ -34,7 +67,11 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === 'GET' && request.url === '/health') {
-    sendJson(response, 200, { ok: true, providerConfigured: Boolean(apiKey) });
+    sendJson(response, 200, {
+      ok: true,
+      providerConfigured: Boolean(apiKey),
+      databaseConfigured: Boolean(mongoUri)
+    });
     return;
   }
 
@@ -82,6 +119,7 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    await saveConversation(requestBody, message);
     sendJson(response, 200, { message });
   } catch (error) {
     console.error('Chat request failed:', error.message);
