@@ -17,10 +17,13 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## AI Copilot
 
-The AI Workplace Assistant works offline with the built-in workplace knowledge base. To enable open-ended ChatGPT-style answers, set `VITE_AI_API_URL` to a server-side endpoint before starting Vite:
+The AI Workplace Assistant works offline with the built-in workplace knowledge base. For open-ended ChatGPT-style answers, run the included backend in a second terminal:
 
 ```env
-VITE_AI_API_URL=http://localhost:3001/api/chat
+AI_API_KEY=your_provider_key
+AI_MODEL=gpt-4o-mini
 ```
 
-The endpoint receives `{ messages, context }` as JSON and should return a JSON object containing one of `message`, `content`, `answer`, or `text`. Keep provider API keys on the server; do not put them in Vite client environment variables.
+Start it with `npm run server`, then set `VITE_AI_API_URL=http://localhost:3001/api/chat` in the frontend environment and restart Vite. The backend uses the OpenAI-compatible Chat Completions API by default; set `AI_API_URL` for another compatible provider. Keep provider API keys on the server and never put them in Vite client environment variables.
+
+The backend exposes `GET /health` and `POST /api/chat`. The chat endpoint receives `{ messages, context }` and returns `{ message }`.
