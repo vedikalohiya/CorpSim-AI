@@ -4,10 +4,16 @@ import {
   LayoutDashboard, UserCheck, Building2, Map, Users, ClipboardList,
   Kanban, Code2, GitBranch, MessageSquare, Mail, BookOpen,
   CalendarCheck, Video, Siren, AlertTriangle, Presentation,
-  BarChart3, Award
+  BarChart3, Award, Bot
 } from 'lucide-react';
 
 const SECTIONS = [
+  {
+    label: 'AI COPILOT',
+    items: [
+      { id: 'ai_mentor', emoji: '🤖', label: 'AI Workplace Assistant', desc: 'Ask anything in real time', icon: Bot },
+    ]
+  },
   {
     label: 'WORKSPACE',
     items: [
