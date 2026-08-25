@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { Bot, Send, Sparkles, Lightbulb, LoaderCircle } from 'lucide-react';
-import { askCopilot, QUICK_PROMPTS } from '../services/copilotEngine';
+import { streamCopilot, QUICK_PROMPTS } from '../services/copilotEngine';
 
 export default function AIMentorPanel() {
   const { roleData, tickets } = useWorkspace();
@@ -24,20 +24,34 @@ export default function AIMentorPanel() {
     if (!text.trim()) return;
 
     const userMsg = { id: `u_${Date.now()}`, sender: 'Vedika (You)', avatar: '👩💻', text };
-    const nextMessages = [...messages, userMsg];
-    setMessages(nextMessages);
+    const assistantId = `ai_${Date.now() + 1}`;
+    setMessages(prev => [...prev, userMsg, {
+      id: assistantId,
+      sender: `AI ${activePersona}`,
+      avatar: activePersona === 'Manager' ? '👩💼' : activePersona === 'Client' ? '🏦' : '🤖',
+      text: ''
+    }]);
     setInputQuery('');
     setIsThinking(true);
 
-    const aiRes = await askCopilot(text, messages, roleData, tickets);
-    setMessages(prev => [...prev, {
-      id: `ai_${Date.now()}`,
-      sender: `AI ${activePersona}`,
-      avatar: activePersona === 'Manager' ? '👩💼' : activePersona === 'Client' ? '🏦' : '🤖',
-      text: aiRes.text,
-      tips: aiRes.tips
-    }]);
-    setIsThinking(false);
+    try {
+      const aiRes = await streamCopilot(text, messages, roleData, tickets, token => {
+        setMessages(prev => prev.map(message => message.id === assistantId
+          ? { ...message, text: `${message.text}${token}` }
+          : message));
+      });
+      if (aiRes.text && !import.meta.env.VITE_AI_API_URL) {
+        setMessages(prev => prev.map(message => message.id === assistantId
+          ? { ...message, text: aiRes.text, tips: aiRes.tips }
+          : message));
+      }
+    } catch (error) {
+      setMessages(prev => prev.map(message => message.id === assistantId
+        ? { ...message, text: `I couldn't connect to the AI service. ${error.message}` }
+        : message));
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   return (

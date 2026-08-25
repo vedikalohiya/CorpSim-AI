@@ -48,6 +48,21 @@ function sendJson(response, status, body) {
   response.end(JSON.stringify(body));
 }
 
+function startStream(response) {
+  response.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'Access-Control-Allow-Origin': process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  });
+}
+
+function sendEvent(response, event, data) {
+  response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
 function readBody(request) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -92,6 +107,7 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    const wantsStream = request.headers.accept?.includes('text/event-stream');
     const providerResponse = await fetch(providerUrl, {
       method: 'POST',
       headers: {
@@ -101,17 +117,69 @@ const server = http.createServer(async (request, response) => {
       body: JSON.stringify({
         model,
         messages: requestBody.messages,
-        temperature: 0.7
+        temperature: 0.7,
+        stream: wantsStream
       })
     });
 
-    const providerBody = await providerResponse.json();
     if (!providerResponse.ok) {
+      const providerBody = await providerResponse.json();
       sendJson(response, providerResponse.status, {
         error: providerBody.error?.message || 'AI provider request failed'
       });
       return;
     }
+
+    if (wantsStream) {
+      if (!providerResponse.body) {
+        sendJson(response, 502, { error: 'AI provider did not return a stream' });
+        return;
+      }
+
+      startStream(response);
+      const reader = providerResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let message = '';
+
+      const processLine = line => {
+        if (!line.startsWith('data:')) return;
+        const data = line.slice(5).trim();
+        if (data === '[DONE]') return;
+        try {
+          const chunk = JSON.parse(data).choices?.[0]?.delta?.content;
+          if (chunk) {
+            message += chunk;
+            sendEvent(response, 'token', { text: chunk });
+          }
+        } catch {
+          // Ignore incomplete provider events; the next chunk completes them.
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        lines.forEach(processLine);
+        if (done) break;
+      }
+
+      if (buffer) processLine(buffer);
+      if (!message) {
+        sendEvent(response, 'error', { error: 'AI provider returned no message' });
+        response.end();
+        return;
+      }
+
+      await saveConversation(requestBody, message);
+      sendEvent(response, 'done', {});
+      response.end();
+      return;
+    }
+
+    const providerBody = await providerResponse.json();
 
     const message = providerBody.choices?.[0]?.message?.content;
     if (!message) {

@@ -868,6 +868,62 @@ export async function askCopilot(query, conversation, roleData, tickets) {
   }
 }
 
+export async function streamCopilot(query, conversation, roleData, tickets, onToken) {
+  const endpoint = import.meta.env.VITE_AI_API_URL;
+  if (!endpoint) return getCopilotResponse(query, roleData, tickets);
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Accept: 'text/event-stream',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      messages: [
+        {
+          role: 'system',
+          content: `You are the helpful AI Workplace Copilot for ${roleData.title} at ${roleData.company}. Answer the user's question directly and conversationally. Use the workspace context when relevant, but answer general questions too. Do not claim to have performed actions or know facts that are not provided.`
+        },
+        ...conversation.slice(-10).map(message => ({
+          role: message.sender === 'Vedika (You)' ? 'user' : 'assistant',
+          content: message.text
+        })),
+        { role: 'user', content: query }
+      ],
+      context: { role: roleData.title, company: roleData.company, tickets }
+    })
+  });
+
+  if (!response.ok || !response.body) throw new Error(`AI request failed with ${response.status}`);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let text = '';
+
+  const processEvent = event => {
+    const dataLine = event.split('\n').find(line => line.startsWith('data:'));
+    if (!dataLine) return;
+    const data = JSON.parse(dataLine.slice(5).trim());
+    if (data.error) throw new Error(data.error);
+    if (data.text) {
+      text += data.text;
+      onToken(data.text);
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+    events.forEach(processEvent);
+    if (done) break;
+  }
+  if (buffer) processEvent(buffer);
+  return { text, suggestions: [] };
+}
+
 // Quick suggestion prompts for the UI
 export const QUICK_PROMPTS = [
   { icon: '📋', text: 'What are my current Jira tickets?' },
