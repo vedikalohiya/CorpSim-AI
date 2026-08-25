@@ -839,7 +839,7 @@ export async function askCopilot(query, conversation, roleData, tickets) {
         messages: [
           {
             role: 'system',
-            content: `You are the helpful AI Workplace Copilot for ${roleData.title} at ${roleData.company}. Answer the user's question directly and conversationally. Use the workspace context when relevant, but answer general questions too. Do not claim to have performed actions or know facts that are not provided.`
+            content: `You are a general-purpose AI assistant with broad knowledge. Answer any safe user question directly, clearly, and conversationally, including science, history, writing, coding, life advice, mathematics, and workplace topics. You are also the workplace copilot for ${roleData.title} at ${roleData.company}, so use the workspace context when relevant. Do not claim to have performed actions or know facts that are not provided. If a question needs current information, say that your knowledge may be incomplete and ask for a source or details.`
           },
           ...conversation.slice(-10).map(message => ({
             role: message.sender === 'Vedika (You)' ? 'user' : 'assistant',
@@ -863,7 +863,10 @@ export async function askCopilot(query, conversation, roleData, tickets) {
 
     return { text, suggestions: [] };
   } catch (error) {
-    console.warn('AI endpoint unavailable; using local copilot responses.', error);
+    console.error('AI endpoint unavailable.', error);
+    if (endpoint) {
+      throw new Error('The AI service is unavailable. Check the backend and AI provider configuration.');
+    }
     return getCopilotResponse(query, roleData, tickets);
   }
 }
@@ -882,7 +885,7 @@ export async function streamCopilot(query, conversation, roleData, tickets, onTo
       messages: [
         {
           role: 'system',
-          content: `You are the helpful AI Workplace Copilot for ${roleData.title} at ${roleData.company}. Answer the user's question directly and conversationally. Use the workspace context when relevant, but answer general questions too. Do not claim to have performed actions or know facts that are not provided.`
+          content: `You are a general-purpose AI assistant with broad knowledge. Answer any safe user question directly, clearly, and conversationally, including science, history, writing, coding, life advice, mathematics, and workplace topics. You are also the workplace copilot for ${roleData.title} at ${roleData.company}, so use the workspace context when relevant. Do not claim to have performed actions or know facts that are not provided. If a question needs current information, say that your knowledge may be incomplete and ask for a source or details.`
         },
         ...conversation.slice(-10).map(message => ({
           role: message.sender === 'Vedika (You)' ? 'user' : 'assistant',

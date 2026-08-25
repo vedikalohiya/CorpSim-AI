@@ -17,7 +17,7 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## AI Copilot
 
-The AI Workplace Assistant works offline with the built-in workplace knowledge base. For open-ended ChatGPT-style answers, run the included backend in a second terminal:
+The AI Workplace Assistant has two modes. Without configuration it uses the built-in workplace knowledge base. For a real general-purpose chatbot that can answer broad questions, connect the included backend to an AI model provider:
 
 ```env
 AI_API_KEY=your_provider_key
@@ -27,5 +27,7 @@ MONGODB_DATABASE=corpsim
 ```
 
 Start it with `npm run server`, then set `VITE_AI_API_URL=http://localhost:3001/api/chat` in the frontend environment and restart Vite. The backend uses the OpenAI-compatible Chat Completions API by default; set `AI_API_URL` for another compatible provider. When `MONGODB_URI` is set, chat exchanges are saved in the `chat_messages` collection. Keep provider API keys and MongoDB credentials on the server and never put them in Vite client environment variables.
+
+With `VITE_AI_API_URL` configured, all prompts are sent to the provider, including general questions about science, history, writing, coding, mathematics, and more. The model can answer safe questions broadly, but no AI system can guarantee literally every question or real-time accuracy without web search and appropriate safeguards.
 
 The backend exposes `GET /health` and `POST /api/chat`. The chat endpoint receives `{ messages, context }` and returns `{ message }`.
